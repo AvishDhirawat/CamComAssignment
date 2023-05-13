@@ -15,7 +15,7 @@ def execute_query(query):
     cursor = db.cursor(buffered=True)
     cursor.execute(query)
     db.commit()
-    return cursor.fetchall()
+    return cursor
 
 
 @app.route('/qc_persons', methods=['GET'])
@@ -40,13 +40,14 @@ def assign_task():
     task_id = request.json['task_id']
     # Check which QC persons are free
     query = "SELECT * FROM qc_persons WHERE is_busy = FALSE"
-    results = execute_query(query)
+    results = execute_query(query).fetchall()
+    execute_query(query).close()
     if len(results) == 0:
         return "No QC persons are free to assign the task", 400
     # Assign the task to the first free QC person
     qc_person = results[0]
     query = f"UPDATE qc_persons SET is_busy = TRUE, current_task = {task_id} WHERE id = {qc_person[0]}"
-    execute_query(query)
+    execute_query(query).close()
     return "Task assigned successfully"
 
 
@@ -56,14 +57,16 @@ def task_completed():
     task_id = request.json['task_id']
     query = f"UPDATE qc_persons SET is_busy = FALSE, current_task = NULL WHERE id = {qc_person_id} AND current_task = {task_id}"
     rows_affected = execute_query(query).rowcount
+    execute_query(query).close()
     if rows_affected == 0:
         return "Task not found or not assigned to the given QC person", 400
     query = f"SELECT id FROM tasks WHERE status = 'pending' LIMIT 1"
-    results = execute_query(query)
+    results = execute_query(query).fetchall()
+    execute_query(query).close()
     if len(results) > 0:
         task_id = results[0][0]
         query = f"UPDATE qc_persons SET is_busy = TRUE, current_task = {task_id} WHERE id = {qc_person_id}"
-        execute_query(query)
+        execute_query(query).close()
     return "Task marked as completed successfully"
 
 
