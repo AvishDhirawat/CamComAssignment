@@ -160,7 +160,7 @@ def logout():
             return "QCPerson already Logged-Out!", 400
         execute_query(query).close()
         if len(results) > 0:
-            query = f"UPDATE tasks SET status = 'pending', assigned_to = NULL WHERE id = {results[0][0]}"
+            query = f"UPDATE tasks SET status = 'pending', assigned_to = NULL WHERE id = {results[0][3]}"
             execute_query(query).close()
         return f"QCPerson with id {qc_person_id}, is now logged out successfully!"
     except mysql.connector.Error as error:
