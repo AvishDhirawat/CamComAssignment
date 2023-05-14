@@ -45,7 +45,7 @@ def get_qc_persons():
 @app.route('/qc_persons_available', methods=['GET'])
 def available_qc_person():
     query = "SELECT * FROM qc_persons WHERE is_busy = FALSE AND logged_in = TRUE"
-    results = execute_query(query)
+    results = execute_query(query).fetchall()
     persons = []
     for result in results:
         person = {
@@ -56,7 +56,7 @@ def available_qc_person():
             "logged_in": result[4]
         }
         persons.append(person)
-    return jsonify(persons)
+    return results
 
 
 @app.route('/tasks', methods=['GET'])
@@ -82,6 +82,7 @@ def add_task():
     query = "INSERT INTO tasks(id, task_name) VALUES (%s, %s)"
     try:
         execute_insert_query(query, (task_id, task_name)).close()
+        auto_assign_task()
         return "New task added to database"
     except mysql.connector.Error as error:
         result = {'status': 'error', 'message': 'Insert failed: {}'.format(error)}
@@ -101,9 +102,8 @@ def add_qc_person():
         return jsonify(result)
 
 
-@app.route('/assign_task', methods=['POST'])
-def assign_task():
-    task_id = request.json['task_id']
+@app.route('/assign_task/<int:task_id>', methods=['POST'])
+def assign_task(task_id):
     query = f"SELECT * FROM tasks WHERE id = {task_id} AND status = 'pending'"
     task_results = execute_query(query).fetchall()
     execute_query(query).close()
@@ -147,6 +147,7 @@ def task_completed():
     execute_query(query).close()
     if rows_affected == 0:
         return "Task not assigned or it is already completed", 400
+    auto_assign_task()
     return "Task marked as completed successfully"
 
 
@@ -159,6 +160,7 @@ def login():
         if response == 0:
             return "QCPerson already Logged-In!", 400
         execute_query(query).close()
+        auto_assign_task()
         return f"QCPerson with id {qc_person_id}, is now logged in successfully!"
     except mysql.connector.Error as error:
         result = {'status': 'error', 'message': 'Insert failed: {}'.format(error)}
@@ -184,6 +186,28 @@ def logout():
     except mysql.connector.Error as error:
         result = {'status': 'error', 'message': 'Insert failed: {}'.format(error)}
         return jsonify(result)
+
+
+@app.route('/', methods=['GET'])
+def auto_assign_task():
+    i = 0
+    while 1:
+        i += 1
+        query = f"SELECT * FROM tasks WHERE status = 'pending' ORDER BY rand()"
+        available_tasks = execute_query(query).fetchall()
+        execute_query(query).close()
+        if len(available_tasks) == 0:
+            if i>1:
+                return "All available tasks are automatically assigned"
+            return "No pending task available"
+        else:
+            available_qcpersons = available_qc_person()
+            if len(available_qcpersons) == 0:
+                if i>1:
+                    return "All the QC person are assigned automatically with tasks"
+                return "No QCPerson available at the moment!"
+            else:
+                assign_task(available_tasks[0][0])
 
 
 if __name__ == '__main__':
