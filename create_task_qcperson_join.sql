@@ -14,6 +14,7 @@ CREATE TABLE tasks (
     task_name VARCHAR(255) NOT NULL,
     status ENUM('pending', 'in progress', 'completed') DEFAULT 'pending' NOT NULL,
     assigned_to INT DEFAULT NULL,
+    logged_in BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (assigned_to) REFERENCES qc_persons(id)
 );
 

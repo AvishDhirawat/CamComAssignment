@@ -86,11 +86,16 @@ def add_qc_person():
 @app.route('/assign_task', methods=['POST'])
 def assign_task():
     task_id = request.json['task_id']
-    query = "SELECT * FROM qc_persons WHERE is_busy = FALSE ORDER BY rand()"
+    query = f"SELECT * FROM tasks WHERE id = {task_id} AND status = 'pending'"
+    task_results = execute_query(query).fetchall()
+    execute_query(query).close()
+    if len(task_results) == 0:
+        return "Task already assigned", 400
+    query = "SELECT * FROM qc_persons WHERE is_busy = FALSE AND logged_in = TRUE ORDER BY rand()"
     results = execute_query(query).fetchall()
     execute_query(query).close()
     if len(results) == 0:
-        return "No QC persons are free to assign the task", 400
+        return "No QC persons are free/logged-in to assign the task", 400
     qc_person = results[0]
     query = "SELECT * FROM tasks WHERE status = 'pending' ORDER BY rand()"
     tasks_result = execute_query(query).fetchall()
@@ -125,6 +130,42 @@ def task_completed():
     if rows_affected == 0:
         return "Task not assigned or it is already completed", 400
     return "Task marked as completed successfully"
+
+
+@app.route('/login', methods=['POST'])
+def login():
+    qc_person_id = request.json['qc_person_id']
+    query = f"UPDATE qc_persons SET logged_in = TRUE WHERE id = {qc_person_id} AND logged_in = FALSE"
+    try:
+        response = execute_query(query).rowcount
+        if response == 0:
+            return "QCPerson already Logged-In!", 400
+        execute_query(query).close()
+        return f"QCPerson with id {qc_person_id}, is now logged in successfully!"
+    except mysql.connector.Error as error:
+        result = {'status': 'error', 'message': 'Insert failed: {}'.format(error)}
+        return jsonify(result)
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    qc_person_id = request.json['qc_person_id']
+    query = f"SELECT * FROM qc_persons WHERE id = {qc_person_id} AND is_busy = TRUE"
+    results = execute_query(query).fetchall()
+    execute_query(query).close()
+    query = f"UPDATE qc_persons SET logged_in = FALSE, current_task = NULL WHERE id = {qc_person_id} AND logged_in = TRUE"
+    try:
+        response = execute_query(query).rowcount
+        if response == 0:
+            return "QCPerson already Logged-Out!", 400
+        execute_query(query).close()
+        if len(results) > 0:
+            query = f"UPDATE tasks SET status = 'pending', assigned_to = NULL WHERE id = {results[0][0]}"
+            execute_query(query).close()
+        return f"QCPerson with id {qc_person_id}, is now logged out successfully!"
+    except mysql.connector.Error as error:
+        result = {'status': 'error', 'message': 'Insert failed: {}'.format(error)}
+        return jsonify(result)
 
 
 if __name__ == '__main__':
