@@ -34,20 +34,46 @@ def get_qc_persons():
     return jsonify(persons)
 
 
+@app.route('/tasks', methods=['GET'])
+def get_tasks():
+    query = "SELECT * FROM tasks"
+    results = execute_query(query)
+    tasks = []
+    for result in results:
+        task = {
+            "id": result[0],
+            "taks_name": result[1],
+            "status": result[2],
+            "assigned_to": result[3]
+        }
+        tasks.append(task)
+    return jsonify(tasks)
+
+
 @app.route('/assign_task', methods=['POST'])
 def assign_task():
-    # Get the data from the request
     task_id = request.json['task_id']
-    # Check which QC persons are free
-    query = "SELECT * FROM qc_persons WHERE is_busy = FALSE"
+    query = "SELECT * FROM qc_persons WHERE is_busy = FALSE ORDER BY rand()"
     results = execute_query(query).fetchall()
     execute_query(query).close()
     if len(results) == 0:
         return "No QC persons are free to assign the task", 400
-    # Assign the task to the first free QC person
     qc_person = results[0]
-    query = f"UPDATE qc_persons SET is_busy = TRUE, current_task = {task_id} WHERE id = {qc_person[0]}"
+    query = "SELECT * FROM tasks WHERE status = 'pending' ORDER BY rand()"
+    tasks_result = execute_query(query).fetchall()
     execute_query(query).close()
+    if len(tasks_result) == 0:
+        return "No pending tasks found", 400
+    query = f"UPDATE qc_persons SET is_busy = TRUE, current_task = {task_id} WHERE id = {qc_person[0]}"
+    rows_affected = execute_query(query).rowcount
+    execute_query(query).close()
+    if rows_affected == 0:
+        return "There's some error in qc_persons table", 400
+    query = f"UPDATE tasks SET status = 'in progress', assigned_to = {qc_person[0]} WHERE id = {task_id}"
+    rows_affected_tasks = execute_query(query).rowcount
+    execute_query(query).close()
+    if rows_affected_tasks == 0:
+        return "There's some error in tasks table", 400
     return "Task assigned successfully"
 
 
@@ -60,13 +86,11 @@ def task_completed():
     execute_query(query).close()
     if rows_affected == 0:
         return "Task not found or not assigned to the given QC person", 400
-    query = f"SELECT id FROM tasks WHERE status = 'pending' LIMIT 1"
-    results = execute_query(query).fetchall()
+    query = f"UPDATE tasks SET status = 'completed' WHERE id = {task_id} AND status = 'in progress'"
+    rows_affected = execute_query(query).rowcount
     execute_query(query).close()
-    if len(results) > 0:
-        task_id = results[0][0]
-        query = f"UPDATE qc_persons SET is_busy = TRUE, current_task = {task_id} WHERE id = {qc_person_id}"
-        execute_query(query).close()
+    if rows_affected == 0:
+        return "Task not assigned or it is already completed", 400
     return "Task marked as completed successfully"
 
 
