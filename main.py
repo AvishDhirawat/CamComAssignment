@@ -5,8 +5,8 @@ app = Flask(__name__)
 
 db = mysql.connector.connect(
     host="localhost",
-    user="root",
-    password="Kavish@0901",
+    user="root",  # Enter your MySQL username here
+    password="Kavish@0901",  # Enter your MySQL password here
     database="qc_database"
 )
 
@@ -16,6 +16,13 @@ def execute_query(query):
     cursor.execute(query)
     db.commit()
     return cursor
+
+
+def execute_insert_query(query, values):
+    cursor2 = db.cursor(buffered=True)
+    cursor2.execute(query, values)
+    db.commit()
+    return cursor2
 
 
 @app.route('/qc_persons', methods=['GET'])
@@ -48,6 +55,32 @@ def get_tasks():
         }
         tasks.append(task)
     return jsonify(tasks)
+
+
+@app.route('/add_task', methods=['POST'])
+def add_task():
+    task_id = request.json['task_id']
+    task_name = request.json['task_name']
+    query = "INSERT INTO tasks(id, task_name) VALUES (%s, %s)"
+    try:
+        execute_insert_query(query, (task_id, task_name)).close()
+        return "New task added to database"
+    except mysql.connector.Error as error:
+        result = {'status': 'error', 'message': 'Insert failed: {}'.format(error)}
+        return jsonify(result)
+
+
+@app.route('/add_qc_person', methods=['POST'])
+def add_qc_person():
+    person_id = request.json['id']
+    person_name = request.json['name']
+    query = "INSERT INTO qc_persons(id, name) VALUES (%s, %s)"
+    try:
+        execute_insert_query(query, (person_id, person_name)).close()
+        return "New QCPerson added to database"
+    except mysql.connector.Error as error:
+        result = {'status': 'error', 'message': 'Insert failed: {}'.format(error)}
+        return jsonify(result)
 
 
 @app.route('/assign_task', methods=['POST'])
