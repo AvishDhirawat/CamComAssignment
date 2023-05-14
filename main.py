@@ -25,7 +25,7 @@ def execute_insert_query(query, values):
     return cursor2
 
 
-@app.route('/qc_persons', methods=['GET'])
+@app.route('/qc_persons_all', methods=['GET'])
 def get_qc_persons():
     query = "SELECT * FROM qc_persons"
     results = execute_query(query)
@@ -35,7 +35,25 @@ def get_qc_persons():
             "id": result[0],
             "name": result[1],
             "is_busy": result[2],
-            "current_task": result[3]
+            "current_task": result[3],
+            "logged_in": result[4]
+        }
+        persons.append(person)
+    return jsonify(persons)
+
+
+@app.route('/qc_persons_available', methods=['GET'])
+def available_qc_person():
+    query = "SELECT * FROM qc_persons WHERE is_busy = FALSE AND logged_in = TRUE"
+    results = execute_query(query)
+    persons = []
+    for result in results:
+        person = {
+            "id": result[0],
+            "name": result[1],
+            "is_busy": result[2],
+            "current_task": result[3],
+            "logged_in": result[4]
         }
         persons.append(person)
     return jsonify(persons)
@@ -153,7 +171,7 @@ def logout():
     query = f"SELECT * FROM qc_persons WHERE id = {qc_person_id} AND is_busy = TRUE"
     results = execute_query(query).fetchall()
     execute_query(query).close()
-    query = f"UPDATE qc_persons SET logged_in = FALSE, current_task = NULL WHERE id = {qc_person_id} AND logged_in = TRUE"
+    query = f"UPDATE qc_persons SET logged_in = FALSE, current_task = NULL, is_busy = FALSE WHERE id = {qc_person_id} AND logged_in = TRUE"
     try:
         response = execute_query(query).rowcount
         if response == 0:
