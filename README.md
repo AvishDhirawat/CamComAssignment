@@ -1,4 +1,4 @@
-# CamComAssignment
+# CamComAssignment - Taks allocation to QC Person
 CamCom Assignment for QC Person
 In a manual QC (Quality Check) process, there is a portal from which each individual QC task is assigned. 
 The portal needs to check how many QC persons are logged in and which of the logged in persons are free, as in not on a task, and automatically assign tasks. 
